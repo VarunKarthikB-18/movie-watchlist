@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+movies.db
+instance/
+migrations/    # optional: if you prefer to track it, remove this line
+.env
