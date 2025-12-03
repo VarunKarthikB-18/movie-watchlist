@@ -1,0 +1,457 @@
+<template>
+  <div class="app-wrapper">
+    <!-- Login/Register Page -->
+    <div v-if="!isAuthenticated" class="auth-page">
+      <div class="auth-content">
+        <div class="logo-section">
+          <h1 class="logo">🎬 CineWatch</h1>
+          <p class="tagline">Your Personal Movie Collection</p>
+        </div>
+
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button 
+              class="tab-btn"
+              :class="{ active: authMode === 'login' }"
+              @click="authMode = 'login'">
+              Sign In
+            </button>
+            <button 
+              class="tab-btn"
+              :class="{ active: authMode === 'register' }"
+              @click="authMode = 'register'">
+              Create Account
+            </button>
+          </div>
+
+          <div class="tab-content">
+            <Login v-if="authMode === 'login'" @login="handleLogin" />
+            <Register v-if="authMode === 'register'" @register="handleRegister" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App Page -->
+    <div v-else class="app-page">
+      <header class="navbar">
+        <div class="navbar-content">
+          <h1 class="navbar-logo">🎬 CineWatch</h1>
+          <button class="logout-btn" @click="handleLogout">Sign Out</button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <div class="sidebar">
+          <AddMovie @movie-added="fetchMovies" />
+        </div>
+        <div class="content">
+          <MovieList :movies="movies" @movie-updated="fetchMovies" @movie-deleted="fetchMovies" />
+        </div>
+      </main>
+    </div>
+
+    <!-- Notifications -->
+    <div v-if="successMsg" class="notification success">
+      <span>✓ {{ successMsg }}</span>
+      <button @click="successMsg = ''" class="close-btn">×</button>
+    </div>
+    <div v-if="errorMsg" class="notification error">
+      <span>✗ {{ errorMsg }}</span>
+      <button @click="errorMsg = ''" class="close-btn">×</button>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import Login from './components/Login.vue'
+import Register from './components/Register.vue'
+import MovieList from './components/MovieList.vue'
+import AddMovie from './components/AddMovie.vue'
+import { getToken, logout } from './services/auth.js'
+import api from './services/api.js'
+
+export default {
+  components: {
+    Login,
+    Register,
+    MovieList,
+    AddMovie
+  },
+  setup() {
+    const isAuthenticated = ref(!!getToken())
+    const authMode = ref('login')
+    const movies = ref([])
+    const successMsg = ref('')
+    const errorMsg = ref('')
+
+    const handleLogin = async () => {
+      isAuthenticated.value = true
+      successMsg.value = 'Welcome back!'
+      setTimeout(() => { successMsg.value = '' }, 3000)
+      await fetchMovies()
+    }
+
+    const handleRegister = async () => {
+      authMode.value = 'login'
+      successMsg.value = 'Account created! Please sign in.'
+      setTimeout(() => { successMsg.value = '' }, 3000)
+    }
+
+    const handleLogout = () => {
+      logout()
+      isAuthenticated.value = false
+      movies.value = []
+      successMsg.value = 'Signed out successfully'
+      setTimeout(() => { successMsg.value = '' }, 2000)
+    }
+
+    const fetchMovies = async () => {
+      try {
+        const response = await api.get('/movies')
+        movies.value = response.data
+        errorMsg.value = ''
+      } catch (error) {
+        errorMsg.value = 'Failed to load movies'
+        console.error(error)
+      }
+    }
+
+    onMounted(() => {
+      if (isAuthenticated.value) {
+        fetchMovies()
+      }
+    })
+
+    return {
+      isAuthenticated,
+      authMode,
+      movies,
+      successMsg,
+      errorMsg,
+      handleLogin,
+      handleRegister,
+      handleLogout,
+      fetchMovies
+    }
+  }
+}
+</script>
+
+<style scoped>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.app-wrapper {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ============ AUTH PAGE ============ */
+.auth-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+.logo-section {
+  text-align: center;
+  color: white;
+  animation: slideDown 0.6s ease-out;
+}
+
+.logo {
+  font-size: 4em;
+  margin-bottom: 10px;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  letter-spacing: 2px;
+}
+
+.tagline {
+  font-size: 1.2em;
+  opacity: 0.9;
+  font-weight: 300;
+}
+
+.auth-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 0;
+  width: 100%;
+  max-width: 450px;
+  overflow: hidden;
+  animation: slideUp 0.6s ease-out;
+}
+
+.auth-tabs {
+  display: flex;
+  background: #f5f5f5;
+  border-bottom: 2px solid #eee;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 18px;
+  border: none;
+  background: transparent;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  color: #999;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tab-btn:hover {
+  color: #333;
+}
+
+.tab-btn.active {
+  color: #667eea;
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #667eea;
+}
+
+.tab-content {
+  padding: 40px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ============ MAIN APP PAGE ============ */
+.app-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+.navbar {
+  background: rgba(10, 10, 30, 0.85);
+  backdrop-filter: blur(10px);
+  padding: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+}
+
+.navbar-logo {
+  font-size: 1.8em;
+  color: white;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.logout-btn {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  gap: 30px;
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar {
+  flex: 0 0 350px;
+  position: sticky;
+  top: 30px;
+  height: fit-content;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ============ NOTIFICATIONS ============ */
+.notification {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  z-index: 1000;
+  animation: slideInRight 0.3s ease-out;
+  font-weight: 600;
+}
+
+.notification.success {
+  background: #4caf50;
+  color: white;
+}
+
+.notification.error {
+  background: #f44336;
+  color: white;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 1.5em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+/* ============ ANIMATIONS ============ */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ============ SCROLLBAR ============ */
+.main-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {
+  .logo {
+    font-size: 2.5em;
+  }
+
+  .auth-card {
+    max-width: 90%;
+  }
+
+  .tab-content {
+    padding: 25px;
+  }
+
+  .main-content {
+    flex-direction: column;
+    gap: 20px;
+    padding: 15px;
+  }
+
+  .sidebar {
+    position: relative;
+    flex: none;
+    top: auto;
+  }
+
+  .navbar-content {
+    padding: 15px 20px;
+  }
+
+  .navbar-logo {
+    font-size: 1.4em;
+  }
+}
+</style>

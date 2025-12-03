@@ -1,0 +1,313 @@
+<template>
+  <div class="movie-card">
+    <div class="card-content">
+      <!-- Poster Image Section -->
+      <div class="poster-section">
+        <img 
+          v-if="movie.poster_url && movie.poster_url !== 'N/A'"
+          :src="movie.poster_url" 
+          :alt="movie.title"
+          class="poster-image"
+          @error="posterError = true">
+        <div v-else-if="posterError || !movie.poster_url" class="poster-placeholder">
+          📽️
+        </div>
+      </div>
+
+      <!-- Movie Info Section -->
+      <div class="info-section">
+        <div class="card-header">
+          <h3>{{ movie.title }}</h3>
+          <button class="btn-delete" @click="handleDelete" :disabled="deleting" title="Delete">✕</button>
+        </div>
+        
+        <div class="card-body">
+          <div v-if="movie.year" class="info-row">
+            <span class="label">Year:</span>
+            <span>{{ movie.year }}</span>
+          </div>
+          
+          <div class="info-row">
+            <span class="label">Watched:</span>
+            <button 
+              class="btn-toggle"
+              :class="{ watched: movie.watched }"
+              @click="handleToggleWatched"
+              :disabled="updating">
+              {{ movie.watched ? '✓ Watched' : '○ Not Watched' }}
+            </button>
+          </div>
+          
+          <div v-if="movie.rating" class="info-row">
+            <span class="label">Rating:</span>
+            <span class="rating">⭐ {{ movie.rating }}/10</span>
+          </div>
+          
+          <div v-if="movie.notes" class="info-row notes">
+            <span class="label">Notes:</span>
+            <p>{{ movie.notes }}</p>
+          </div>
+        </div>
+        
+        <div v-if="error" class="error-msg">{{ error }}</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref } from 'vue'
+import api from '../services/api.js'
+
+export default {
+  props: {
+    movie: {
+      type: Object,
+      required: true
+    }
+  },
+  emits: ['updated', 'deleted'],
+  setup(props, { emit }) {
+    const updating = ref(false)
+    const deleting = ref(false)
+    const error = ref('')
+    const posterError = ref(false)
+
+    const handleToggleWatched = async () => {
+      updating.value = true
+      error.value = ''
+      
+      try {
+        await api.put(`/movies/${props.movie.id}`, {
+          watched: !props.movie.watched
+        })
+        emit('updated')
+      } catch (err) {
+        error.value = 'Failed to update movie'
+      } finally {
+        updating.value = false
+      }
+    }
+
+    const handleDelete = async () => {
+      if (!confirm('Are you sure you want to delete this movie?')) {
+        return
+      }
+      
+      deleting.value = true
+      error.value = ''
+      
+      try {
+        await api.delete(`/movies/${props.movie.id}`)
+        emit('deleted')
+      } catch (err) {
+        error.value = 'Failed to delete movie'
+        deleting.value = false
+      }
+    }
+
+    return {
+      updating,
+      deleting,
+      error,
+      posterError,
+      handleToggleWatched,
+      handleDelete
+    }
+  }
+}
+</script>
+
+<style scoped>
+.movie-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.movie-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.poster-section {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow: hidden;
+}
+
+.poster-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  flex: 1;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.card-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.05em;
+  flex: 1;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.btn-delete {
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #ff5252;
+  transform: scale(1.1);
+}
+
+.btn-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.info-row.notes {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.info-row.notes p {
+  margin: 4px 0 0 0;
+  color: #666;
+  font-style: italic;
+  word-break: break-word;
+  font-size: 0.85em;
+  line-height: 1.3;
+}
+
+.label {
+  font-weight: 600;
+  color: #667eea;
+  min-width: 60px;
+  font-size: 0.85em;
+}
+
+.rating {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.btn-toggle {
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.btn-toggle:hover:not(:disabled) {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.btn-toggle.watched {
+  background: #e8f5e9;
+  border-color: #4caf50;
+  color: #4caf50;
+}
+
+.btn-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  color: #ff6b6b;
+  font-size: 0.8em;
+  background: #ffe0e0;
+  padding: 8px;
+  border-radius: 5px;
+  margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .card-header h3 {
+    font-size: 0.95em;
+  }
+
+  .info-section {
+    padding: 12px;
+  }
+
+  .label {
+    min-width: 50px;
+    font-size: 0.8em;
+  }
+
+  .info-row {
+    font-size: 0.85em;
+  }
+}
+</style>
