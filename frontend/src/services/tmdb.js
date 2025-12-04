@@ -76,3 +76,26 @@ export const searchMoviesTMDB = async (query) => {
     return [];
   }
 };
+
+export const getTrendingMoviesTMDB = async () => {
+  try {
+    const response = await fetch(
+      `${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_API_KEY}&language=en-US`
+    );
+    const data = await response.json();
+    if (data.results && Array.isArray(data.results)) {
+      return data.results.slice(0, 10).map(movie => ({
+        title: movie.title,
+        year: movie.release_date ? parseInt(movie.release_date.slice(0, 4)) : null,
+        poster_url: movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : null,
+        plot: movie.overview,
+        tmdb_id: movie.id,
+        rating: movie.vote_average
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('TMDB trending movies error:', error);
+    return [];
+  }
+};

@@ -36,19 +36,33 @@
 
     <!-- Main App Page -->
     <div v-else class="app-page">
-      <!-- Netflix-style Header -->
+      <!-- Netflix-style Header with Navigation -->
       <header class="netflix-header">
         <div class="header-content">
           <h1 class="logo">🎬 CINEWATCH</h1>
+          <nav class="nav-menu">
+            <button 
+              class="nav-btn"
+              :class="{ active: currentPage === 'home' }"
+              @click="currentPage = 'home'">
+              🏠 Home
+            </button>
+            <button 
+              class="nav-btn"
+              :class="{ active: currentPage === 'watchlist' }"
+              @click="currentPage = 'watchlist'">
+              📽️ My Watchlist
+            </button>
+          </nav>
           <div class="header-controls">
-            <button class="btn-filter" @click="showFilters = !showFilters">⚙️ Filters</button>
+            <button class="btn-filter" @click="showFilters = !showFilters" v-show="currentPage === 'watchlist'">⚙️ Filters</button>
             <button class="logout-btn" @click="handleLogout">Sign Out</button>
           </div>
         </div>
       </header>
 
-      <!-- Filter Panel -->
-      <div v-if="showFilters" class="filter-panel">
+      <!-- Filter Panel (only show in watchlist) -->
+      <div v-if="showFilters && currentPage === 'watchlist'" class="filter-panel">
         <div class="filter-group">
           <label>Search</label>
           <input 
@@ -85,83 +99,84 @@
         </div>
       </div>
 
-      <main class="main-content">
-        <!-- Search Results Section (only when searching) -->
-        <section v-if="filters.search && filters.search.trim().length > 0" class="search-results-section">
-          <h2 class="section-title">🔍 Search Results</h2>
-          <div v-if="searching" class="searching-indicator">Searching...</div>
-          <div v-else-if="searchResults.length === 0" class="empty-state">
-            <p>No movies found for "{{ filters.search }}"</p>
-          </div>
-          <div v-else>
-            <MovieList 
-              :movies="searchResults" 
-              @movie-clicked="openMovieDetail" />
-          </div>
-        </section>
+      <!-- HOME PAGE -->
+      <div v-if="currentPage === 'home'" class="page-content">
+        <Home 
+          :movies="movies"
+          @movie-clicked="openMovieDetail" />
+      </div>
 
-        <!-- Hero Section with Quick Add (only show when searching) -->
-        <section v-if="filters.search && filters.search.trim().length > 0" class="hero-section">
-          <div class="hero-overlay"></div>
-          <div class="hero-content">
-            <h2>Add Your Next Movie</h2>
-            <AddMovie @movie-added="fetchMovies" />
-          </div>
-        </section>
+      <!-- WATCHLIST PAGE -->
+      <div v-if="currentPage === 'watchlist'" class="page-content">
+        <main class="main-content">
+          <!-- Search Results Section (only when searching) -->
+          <section v-if="filters.search && filters.search.trim().length > 0" class="search-results-section">
+            <h2 class="section-title">🔍 Search Results</h2>
+            <div v-if="searching" class="searching-indicator">Searching...</div>
+            <div v-else-if="searchResults.length === 0" class="empty-state">
+              <p>No movies found for "{{ filters.search }}"</p>
+            </div>
+            <div v-else>
+              <MovieList 
+                :movies="searchResults" 
+                @movie-clicked="openMovieDetail" />
+            </div>
+          </section>
 
-        <!-- Hero Section with Quick Add (normal view when not searching) -->
-        <section v-else class="hero-section">
-          <div class="hero-overlay"></div>
-          <div class="hero-content">
-            <h2>Add Your Next Movie</h2>
-            <AddMovie @movie-added="fetchMovies" />
-          </div>
-        </section>
+          <!-- Hero Section with Quick Add -->
+          <section class="hero-section">
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+              <h2>Add Your Next Movie</h2>
+              <AddMovie @movie-added="fetchMovies" />
+            </div>
+          </section>
 
-        <!-- Stats Section -->
-        <section class="stats-section">
-          <div class="stat-card">
-            <span class="stat-icon">🎬</span>
-            <div class="stat-info">
-              <span class="stat-number">{{ movies.length }}</span>
-              <span class="stat-label">Total Movies</span>
+          <!-- Stats Section -->
+          <section class="stats-section">
+            <div class="stat-card">
+              <span class="stat-icon">🎬</span>
+              <div class="stat-info">
+                <span class="stat-number">{{ movies.length }}</span>
+                <span class="stat-label">Total Movies</span>
+              </div>
             </div>
-          </div>
-          <div class="stat-card">
-            <span class="stat-icon">✓</span>
-            <div class="stat-info">
-              <span class="stat-number">{{ watchedCount }}</span>
-              <span class="stat-label">Watched</span>
+            <div class="stat-card">
+              <span class="stat-icon">✓</span>
+              <div class="stat-info">
+                <span class="stat-number">{{ watchedCount }}</span>
+                <span class="stat-label">Watched</span>
+              </div>
             </div>
-          </div>
-          <div class="stat-card">
-            <span class="stat-icon">⭐</span>
-            <div class="stat-info">
-              <span class="stat-number">{{ avgRating }}</span>
-              <span class="stat-label">Avg Rating</span>
+            <div class="stat-card">
+              <span class="stat-icon">⭐</span>
+              <div class="stat-info">
+                <span class="stat-number">{{ avgRating }}</span>
+                <span class="stat-label">Avg Rating</span>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- Movies Section (only show when not searching) -->
-        <section v-if="!filters.search || filters.search.trim().length === 0" class="movies-section">
-          <div v-if="filteredMovies.length === 0" class="empty-state">
-            <p v-if="movies.length === 0">📭 No movies yet. Add one to get started!</p>
-            <p v-else>🔍 No movies match your filters</p>
-          </div>
-          
-          <div v-else>
-            <div v-if="isShowingDemoMovies" class="demo-notice">
-              <p>🎬 These are popular movies from TMDB. Click "Add to Watchlist" on any movie to add it to your personal watchlist!</p>
+          <!-- Movies Section (only show when not searching) -->
+          <section v-if="!filters.search || filters.search.trim().length === 0" class="movies-section">
+            <div v-if="filteredMovies.length === 0" class="empty-state">
+              <p v-if="movies.length === 0">📭 No movies yet. Add one to get started!</p>
+              <p v-else>🔍 No movies match your filters</p>
             </div>
-            <MovieList 
-              :movies="filteredMovies" 
-              @movie-updated="fetchMovies" 
-              @movie-deleted="fetchMovies"
-              @movie-clicked="openMovieDetail" />
-          </div>
-        </section>
-      </main>
+            
+            <div v-else>
+              <div v-if="isShowingDemoMovies" class="demo-notice">
+                <p>🎬 These are popular movies from TMDB. Click "Add to Watchlist" on any movie to add it to your personal watchlist!</p>
+              </div>
+              <MovieList 
+                :movies="filteredMovies" 
+                @movie-updated="fetchMovies" 
+                @movie-deleted="fetchMovies"
+                @movie-clicked="openMovieDetail" />
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <!-- Notifications -->
@@ -192,6 +207,7 @@ import Register from './components/Register.vue'
 import MovieList from './components/MovieList.vue'
 import AddMovie from './components/AddMovie.vue'
 import MovieDetailModal from './components/MovieDetailModal.vue'
+import Home from './components/Home.vue'
 import { getToken, logout } from './services/auth.js'
 import api from './services/api.js'
 import { getPopularMoviesTMDB, searchMoviesTMDB } from './services/tmdb.js'
@@ -202,7 +218,8 @@ export default {
     Register,
     MovieList,
     AddMovie,
-    MovieDetailModal
+    MovieDetailModal,
+    Home
   },
   setup() {
     const isAuthenticated = ref(!!getToken())
@@ -215,6 +232,7 @@ export default {
     const showMovieModal = ref(false)
     const searchResults = ref([])
     const searching = ref(false)
+    const currentPage = ref('home') // home, watchlist
     
     const filters = ref({
       search: '',
@@ -288,6 +306,7 @@ export default {
       logout()
       isAuthenticated.value = false
       movies.value = []
+      currentPage.value = 'home'
       successMsg.value = 'Signed out successfully'
       setTimeout(() => { successMsg.value = '' }, 2000)
     }
@@ -378,6 +397,7 @@ export default {
       showMovieModal,
       searchResults,
       searching,
+      currentPage,
       openMovieDetail,
       closeMovieDetail,
       handleLogin,
@@ -552,11 +572,40 @@ export default {
   font-weight: 900;
   color: #e50914;
   letter-spacing: 1px;
+  margin-right: 40px;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 0;
+  flex: 1;
+}
+
+.nav-btn {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-btn:hover {
+  color: #e50914;
+}
+
+.nav-btn.active {
+  color: #e50914;
+  border-bottom-color: #e50914;
 }
 
 .header-controls {
   display: flex;
   gap: 15px;
+  margin-left: auto;
 }
 
 .btn-filter,
@@ -640,6 +689,20 @@ export default {
   width: 100%;
   margin: 0 auto;
   padding: 0 40px;
+}
+
+.page-content {
+  width: 100%;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Hero Section */
@@ -819,6 +882,27 @@ export default {
 @media (max-width: 768px) {
   .header-content {
     padding: 0 20px;
+    flex-wrap: wrap;
+  }
+
+  .header-content .logo {
+    margin-right: 20px;
+    font-size: 1.4em;
+  }
+
+  .nav-menu {
+    order: 3;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .nav-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .header-controls {
+    margin-left: 0;
   }
 
   .main-content {
