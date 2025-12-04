@@ -7,10 +7,12 @@
     <div v-else class="movies-grid">
       <MovieCard 
         v-for="movie in movies" 
-        :key="movie.id"
+        :key="movie.id || movie.tmdb_id || movie.title"
         :movie="movie"
         @updated="$emit('movie-updated')"
-        @deleted="$emit('movie-deleted')" />
+        @deleted="$emit('movie-deleted')"
+        @added="$emit('movie-updated')"
+        @clicked="$emit('movie-clicked', $event)" />
     </div>
   </div>
 </template>
@@ -28,7 +30,7 @@ export default {
       required: true
     }
   },
-  emits: ['movie-updated', 'movie-deleted']
+  emits: ['movie-updated', 'movie-deleted', 'movie-added', 'movie-clicked']
 }
 </script>
 

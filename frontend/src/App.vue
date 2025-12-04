@@ -86,8 +86,31 @@
       </div>
 
       <main class="main-content">
-        <!-- Hero Section with Quick Add -->
-        <section class="hero-section">
+        <!-- Search Results Section (only when searching) -->
+        <section v-if="filters.search && filters.search.trim().length > 0" class="search-results-section">
+          <h2 class="section-title">🔍 Search Results</h2>
+          <div v-if="searching" class="searching-indicator">Searching...</div>
+          <div v-else-if="searchResults.length === 0" class="empty-state">
+            <p>No movies found for "{{ filters.search }}"</p>
+          </div>
+          <div v-else>
+            <MovieList 
+              :movies="searchResults" 
+              @movie-clicked="openMovieDetail" />
+          </div>
+        </section>
+
+        <!-- Hero Section with Quick Add (only show when searching) -->
+        <section v-if="filters.search && filters.search.trim().length > 0" class="hero-section">
+          <div class="hero-overlay"></div>
+          <div class="hero-content">
+            <h2>Add Your Next Movie</h2>
+            <AddMovie @movie-added="fetchMovies" />
+          </div>
+        </section>
+
+        <!-- Hero Section with Quick Add (normal view when not searching) -->
+        <section v-else class="hero-section">
           <div class="hero-overlay"></div>
           <div class="hero-content">
             <h2>Add Your Next Movie</h2>
@@ -120,18 +143,23 @@
           </div>
         </section>
 
-        <!-- Movies Section -->
-        <section class="movies-section">
+        <!-- Movies Section (only show when not searching) -->
+        <section v-if="!filters.search || filters.search.trim().length === 0" class="movies-section">
           <div v-if="filteredMovies.length === 0" class="empty-state">
             <p v-if="movies.length === 0">📭 No movies yet. Add one to get started!</p>
             <p v-else>🔍 No movies match your filters</p>
           </div>
           
-          <MovieList 
-            v-else
-            :movies="filteredMovies" 
-            @movie-updated="fetchMovies" 
-            @movie-deleted="fetchMovies" />
+          <div v-else>
+            <div v-if="isShowingDemoMovies" class="demo-notice">
+              <p>🎬 These are popular movies from TMDB. Click "Add to Watchlist" on any movie to add it to your personal watchlist!</p>
+            </div>
+            <MovieList 
+              :movies="filteredMovies" 
+              @movie-updated="fetchMovies" 
+              @movie-deleted="fetchMovies"
+              @movie-clicked="openMovieDetail" />
+          </div>
         </section>
       </main>
     </div>
@@ -145,24 +173,36 @@
       <span>✗ {{ errorMsg }}</span>
       <button @click="errorMsg = ''" class="close-btn">×</button>
     </div>
+
+    <!-- Movie Detail Modal -->
+    <MovieDetailModal 
+      :isOpen="showMovieModal"
+      :movie="selectedMovie"
+      @close="closeMovieDetail"
+      @updated="fetchMovies"
+      @deleted="fetchMovies"
+      @added="fetchMovies" />
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import Login from './components/Login.vue'
 import Register from './components/Register.vue'
 import MovieList from './components/MovieList.vue'
 import AddMovie from './components/AddMovie.vue'
+import MovieDetailModal from './components/MovieDetailModal.vue'
 import { getToken, logout } from './services/auth.js'
 import api from './services/api.js'
+import { getPopularMoviesTMDB, searchMoviesTMDB } from './services/tmdb.js'
 
 export default {
   components: {
     Login,
     Register,
     MovieList,
-    AddMovie
+    AddMovie,
+    MovieDetailModal
   },
   setup() {
     const isAuthenticated = ref(!!getToken())
@@ -171,6 +211,10 @@ export default {
     const successMsg = ref('')
     const errorMsg = ref('')
     const showFilters = ref(false)
+    const selectedMovie = ref(null)
+    const showMovieModal = ref(false)
+    const searchResults = ref([])
+    const searching = ref(false)
     
     const filters = ref({
       search: '',
@@ -186,8 +230,9 @@ export default {
     const avgRating = computed(() => {
       const ratedMovies = movies.value.filter(m => m.rating)
       if (ratedMovies.length === 0) return '—'
-      const avg = (ratedMovies.reduce((sum, m) => sum + m.rating, 0) / ratedMovies.length).toFixed(1)
-      return avg
+      const avg = (ratedMovies.reduce((sum, m) => sum + parseFloat(m.rating || 0), 0) / ratedMovies.length)
+      // Format to 2 decimal places, removing trailing zeros
+      return parseFloat(avg.toFixed(2))
     })
 
     const filteredMovies = computed(() => {
@@ -247,16 +292,69 @@ export default {
       setTimeout(() => { successMsg.value = '' }, 2000)
     }
 
+    const isShowingDemoMovies = computed(() => {
+      // Check if movies are from TMDB (have tmdb_id but no id)
+      return movies.value.length > 0 && movies.value.some(m => m.tmdb_id && !m.id)
+    })
+
     const fetchMovies = async () => {
       try {
+        // Try fetching from backend first
         const response = await api.get('/movies')
-        movies.value = response.data
+        if (response.data && response.data.length > 0) {
+          movies.value = response.data
+          errorMsg.value = ''
+          return
+        }
+        // If no user movies, fetch popular ones from TMDB (demo)
+        const tmdbMovies = await getPopularMoviesTMDB();
+        movies.value = tmdbMovies;
         errorMsg.value = ''
       } catch (error) {
-        errorMsg.value = 'Failed to load movies'
-        console.error(error)
+        // Fallback: fetch demo movies from TMDB
+        const tmdbMovies = await getPopularMoviesTMDB();
+        movies.value = tmdbMovies;
+        errorMsg.value = 'Unable to load your watchlist, showing sample movies.'
+        console.error(error);
       }
     }
+
+    const openMovieDetail = (movie) => {
+      selectedMovie.value = movie
+      showMovieModal.value = true
+    }
+
+    const closeMovieDetail = () => {
+      showMovieModal.value = false
+      selectedMovie.value = null
+    }
+
+    // Watch for search input changes and fetch TMDB results
+    let searchTimeout = null
+    watch(() => filters.value.search, (newSearch) => {
+      // Clear previous timeout
+      if (searchTimeout) {
+        clearTimeout(searchTimeout)
+      }
+      
+      // Debounce search by 300ms
+      searchTimeout = setTimeout(async () => {
+        if (newSearch && newSearch.trim().length > 0) {
+          searching.value = true
+          try {
+            const results = await searchMoviesTMDB(newSearch.trim())
+            searchResults.value = results
+          } catch (err) {
+            console.error('Search error:', err)
+            searchResults.value = []
+          } finally {
+            searching.value = false
+          }
+        } else {
+          searchResults.value = []
+        }
+      }, 300)
+    })
 
     onMounted(() => {
       if (isAuthenticated.value) {
@@ -275,6 +373,13 @@ export default {
       filteredMovies,
       watchedCount,
       avgRating,
+      isShowingDemoMovies,
+      selectedMovie,
+      showMovieModal,
+      searchResults,
+      searching,
+      openMovieDetail,
+      closeMovieDetail,
       handleLogin,
       handleRegister,
       handleLogout,
@@ -614,6 +719,25 @@ export default {
   font-size: 0.9em;
 }
 
+/* Search Results Section */
+.search-results-section {
+  margin: 40px 0 30px 0;
+}
+
+.section-title {
+  font-size: 1.8em;
+  color: #fff;
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+.searching-indicator {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 1.1em;
+}
+
 /* Movies Section */
 .movies-section {
   margin: 40px 0 60px 0;
@@ -624,6 +748,22 @@ export default {
   padding: 60px 20px;
   color: #666;
   font-size: 1.2em;
+}
+
+.demo-notice {
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.2), rgba(100, 100, 100, 0.2));
+  border: 1px solid rgba(229, 9, 20, 0.5);
+  border-radius: 8px;
+  padding: 15px 20px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.demo-notice p {
+  color: #fff;
+  margin: 0;
+  font-size: 0.95em;
+  font-weight: 500;
 }
 
 /* Notifications */

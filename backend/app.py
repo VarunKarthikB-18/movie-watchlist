@@ -28,7 +28,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
-    CORS(app)  # Enable CORS for frontend communication
+    CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5001"], supports_credentials=True)  # Enable CORS for frontend communication
     JWTManager(app)
 
     @app.route('/')
@@ -149,7 +149,7 @@ class Movie(db.Model):
     title = db.Column(db.String(150), nullable=False)
     year = db.Column(db.Integer)
     watched = db.Column(db.Boolean, default=False)
-    rating = db.Column(db.Integer)
+    rating = db.Column(db.Numeric(3, 2))  # Allows decimals up to 2 places (e.g., 9.75)
     notes = db.Column(db.Text)
     poster_url = db.Column(db.String(255))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -171,4 +171,4 @@ class Movie(db.Model):
 if __name__ == "__main__":
     # For local run: use create_app() and run with Flask development server
     app = create_app()
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

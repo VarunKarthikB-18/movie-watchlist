@@ -6,11 +6,11 @@
       <div class="search-box">
         <input 
           v-model="searchQuery"
-          @keyup.enter="searchOMDB"
+          @keyup.enter="searchTMDB"
           type="text"
           placeholder="Search for a movie..."
           class="search-input">
-        <button @click="searchOMDB" class="search-btn" :disabled="!searchQuery || searching">
+        <button @click="searchTMDB" class="search-btn" :disabled="!searchQuery || searching">
           {{ searching ? 'Searching...' : '🔍' }}
         </button>
       </div>
@@ -67,9 +67,10 @@
               id="rating"
               v-model.number="rating" 
               type="number"
-              placeholder="Rate (1-10)"
+              placeholder="e.g., 8.5"
               min="1"
               max="10"
+              step="0.01"
               @blur="validateRating">
             <span v-if="rating !== null && rating !== undefined" class="rating-display">{{ rating }}/10</span>
           </div>
@@ -105,7 +106,7 @@
 
 <script>
 import { ref } from 'vue'
-import { searchMoviesOMDB } from '../services/omdb.js'
+import { searchMoviesTMDB } from '../services/tmdb.js'
 import api from '../services/api.js'
 
 export default {
@@ -122,9 +123,13 @@ export default {
     const searchQuery = ref('')
     const searching = ref(false)
     const searchResults = ref([])
+    const selectedPosterUrl = ref(null)
 
     const validateRating = () => {
       if (rating.value !== null && rating.value !== undefined) {
+        // Round to 2 decimal places
+        rating.value = Math.round(rating.value * 100) / 100
+        
         if (rating.value > 10) {
           rating.value = 10
           ratingError.value = 'Rating cannot exceed 10'
@@ -133,20 +138,21 @@ export default {
           rating.value = 1
           ratingError.value = 'Rating must be at least 1'
           setTimeout(() => ratingError.value = '', 3000)
+        } else if (rating.value <= 0) {
+          rating.value = null
+          ratingError.value = ''
         } else {
           ratingError.value = ''
         }
       }
     }
 
-    const searchOMDB = async () => {
+    const searchTMDB = async () => {
       if (!searchQuery.value.trim()) return
-      
       searching.value = true
       searchResults.value = []
-      
       try {
-        const results = await searchMoviesOMDB(searchQuery.value)
+        const results = await searchMoviesTMDB(searchQuery.value)
         searchResults.value = results
       } catch (err) {
         error.value = 'Failed to search movies'
@@ -158,6 +164,8 @@ export default {
     const selectFromSearch = (result) => {
       title.value = result.title
       year.value = result.year
+      // Store poster_url in a ref so we can send it when adding
+      selectedPosterUrl.value = result.poster_url || null
       searchResults.value = []
       searchQuery.value = ''
     }
@@ -172,7 +180,8 @@ export default {
           year: year.value || null,
           rating: rating.value || null,
           notes: notes.value || null,
-          watched: watched.value
+          watched: watched.value,
+          poster_url: selectedPosterUrl.value || null
         })
         
         title.value = ''
@@ -180,6 +189,7 @@ export default {
         rating.value = null
         notes.value = ''
         watched.value = false
+        selectedPosterUrl.value = null
         
         emit('movie-added')
       } catch (err) {
@@ -201,7 +211,8 @@ export default {
       searchQuery,
       searching,
       searchResults,
-      searchOMDB,
+      selectedPosterUrl,
+      searchTMDB,
       selectFromSearch,
       validateRating,
       handleAddMovie

@@ -1,5 +1,5 @@
 <template>
-  <div class="movie-card" :class="{ watched: movie.watched }">
+  <div class="movie-card" :class="{ watched: movie.watched }" @click="handleCardClick">
     <!-- Poster Container -->
     <div class="poster-container">
       <img 
@@ -14,21 +14,33 @@
 
       <!-- Hover Overlay -->
       <div class="overlay">
+        <!-- For demo/TMDB movies (no id) - show Add button -->
         <button 
-          class="btn-toggle-watched"
-          :class="{ watched: movie.watched }"
-          @click="handleToggleWatched"
-          :disabled="updating"
-          :title="movie.watched ? 'Mark as unwatched' : 'Mark as watched'">
-          {{ movie.watched ? '✓ Watched' : '+ Watchlist' }}
+          v-if="!movie.id"
+          class="btn-add-to-watchlist"
+          @click="handleAddToWatchlist"
+          :disabled="adding"
+          :title="'Add to Watchlist'">
+          {{ adding ? 'Adding...' : '+ Add to Watchlist' }}
         </button>
-        <button 
-          class="btn-delete"
-          @click="handleDelete"
-          :disabled="deleting"
-          title="Delete">
-          🗑️
-        </button>
+        <!-- For user's saved movies (has id) - show normal controls -->
+        <template v-else>
+          <button 
+            class="btn-toggle-watched"
+            :class="{ watched: movie.watched }"
+            @click="handleToggleWatched"
+            :disabled="updating"
+            :title="movie.watched ? 'Mark as unwatched' : 'Mark as watched'">
+            {{ movie.watched ? '✓ Watched' : '+ Watchlist' }}
+          </button>
+          <button 
+            class="btn-delete"
+            @click="handleDelete"
+            :disabled="deleting"
+            title="Delete">
+            🗑️
+          </button>
+        </template>
       </div>
 
       <!-- Watched Badge -->
@@ -59,30 +71,18 @@ export default {
       required: true
     }
   },
-  emits: ['updated', 'deleted'],
+  emits: ['updated', 'deleted', 'added', 'clicked'],
   setup(props, { emit }) {
     const updating = ref(false)
     const deleting = ref(false)
+    const adding = ref(false)
     const error = ref('')
     const posterError = ref(false)
 
-    const handleToggleWatched = async () => {
-      updating.value = true
-      error.value = ''
-      
-      try {
-        await api.put(`/movies/${props.movie.id}`, {
-          watched: !props.movie.watched
-        })
-        emit('updated')
-      } catch (err) {
-        error.value = 'Failed to update'
-      } finally {
-        updating.value = false
-      }
-    }
 
-    const handleDelete = async () => {
+    const handleDelete = async (e) => {
+      e.stopPropagation()
+      if (!props.movie.id) return
       if (!confirm('Delete this movie?')) {
         return
       }
@@ -99,11 +99,60 @@ export default {
       }
     }
 
+    const handleCardClick = (e) => {
+      // Don't open modal if clicking on buttons
+      if (e.target.closest('button')) return
+      emit('clicked', props.movie)
+    }
+
+    const handleAddToWatchlist = async (e) => {
+      e.stopPropagation()
+      adding.value = true
+      error.value = ''
+      
+      try {
+        await api.post('/movies', {
+          title: props.movie.title,
+          year: props.movie.year || null,
+          rating: props.movie.rating || null,
+          notes: props.movie.plot || null,
+          watched: false,
+          poster_url: props.movie.poster_url || null
+        })
+        emit('added')
+      } catch (err) {
+        error.value = err.response?.data?.msg || 'Failed to add movie'
+      } finally {
+        adding.value = false
+      }
+    }
+
+    const handleToggleWatched = async (e) => {
+      e.stopPropagation()
+      if (!props.movie.id) return
+      updating.value = true
+      error.value = ''
+      
+      try {
+        await api.put(`/movies/${props.movie.id}`, {
+          watched: !props.movie.watched
+        })
+        emit('updated')
+      } catch (err) {
+        error.value = 'Failed to update'
+      } finally {
+        updating.value = false
+      }
+    }
+
     return {
       updating,
       deleting,
+      adding,
       error,
       posterError,
+      handleCardClick,
+      handleAddToWatchlist,
       handleToggleWatched,
       handleDelete
     }
@@ -235,6 +284,29 @@ export default {
 
 .btn-delete:disabled {
   opacity: 0.5;
+}
+
+.btn-add-to-watchlist {
+  background: #e50914;
+  color: white;
+  width: 100%;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: all 0.3s;
+}
+
+.btn-add-to-watchlist:hover:not(:disabled) {
+  background: #c40812;
+  transform: scale(1.05);
+}
+
+.btn-add-to-watchlist:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Badges */
