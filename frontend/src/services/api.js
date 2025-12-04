@@ -27,8 +27,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If 401, clear token and redirect to login
-    if (error.response?.status === 401) {
+    // If 401 or 422 (malformed token), clear token and redirect to login
+    if (error.response?.status === 401 || error.response?.status === 422) {
       localStorage.removeItem('access_token')
       localStorage.removeItem('user_id')
       window.location.href = '/'

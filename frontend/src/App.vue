@@ -318,23 +318,13 @@ export default {
 
     const fetchMovies = async () => {
       try {
-        // Try fetching from backend first
         const response = await api.get('/movies')
-        if (response.data && response.data.length > 0) {
-          movies.value = response.data
-          errorMsg.value = ''
-          return
-        }
-        // If no user movies, fetch popular ones from TMDB (demo)
-        const tmdbMovies = await getPopularMoviesTMDB();
-        movies.value = tmdbMovies;
+        movies.value = response.data || []
         errorMsg.value = ''
       } catch (error) {
-        // Fallback: fetch demo movies from TMDB
-        const tmdbMovies = await getPopularMoviesTMDB();
-        movies.value = tmdbMovies;
-        errorMsg.value = 'Unable to load your watchlist, showing sample movies.'
         console.error(error);
+        errorMsg.value = 'Unable to load your watchlist.'
+        movies.value = []
       }
     }
 

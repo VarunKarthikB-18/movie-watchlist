@@ -61,7 +61,7 @@ def create_app():
         user = User.query.filter_by(email=email).first()
         if not user or not check_password_hash(user.password, password):
             return {"msg":"bad credentials"}, 401
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         return {"access_token": access_token, "user_id": user.id}, 200
 
     # ---------- MOVIE CRUD (protected) ----------

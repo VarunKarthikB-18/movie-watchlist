@@ -26,6 +26,13 @@
         <!-- For user's saved movies (has id) - show normal controls -->
         <template v-else>
           <button 
+            class="btn-icon"
+            @click="handleRefreshImage"
+            :disabled="refreshing"
+            title="Refresh Image">
+            <span :class="{ 'spin': refreshing }">🔄</span>
+          </button>
+          <button 
             class="btn-toggle-watched"
             :class="{ watched: movie.watched }"
             @click="handleToggleWatched"
@@ -63,6 +70,7 @@
 <script>
 import { ref } from 'vue'
 import api from '../services/api.js'
+import { searchMoviesTMDB } from '../services/tmdb.js'
 
 export default {
   props: {
@@ -76,6 +84,7 @@ export default {
     const updating = ref(false)
     const deleting = ref(false)
     const adding = ref(false)
+    const refreshing = ref(false)
     const error = ref('')
     const posterError = ref(false)
 
@@ -145,6 +154,36 @@ export default {
       }
     }
 
+    const handleRefreshImage = async (e) => {
+      e.stopPropagation()
+      if (!props.movie.id) return
+      refreshing.value = true
+      error.value = ''
+
+      try {
+        // Search TMDB for the movie
+        const results = await searchMoviesTMDB(props.movie.title)
+        if (results && results.length > 0) {
+          const newPoster = results[0].poster_url
+          if (newPoster) {
+            // Update backend
+            await api.put(`/movies/${props.movie.id}`, {
+              poster_url: newPoster
+            })
+            emit('updated')
+          } else {
+            error.value = 'No image found'
+          }
+        } else {
+          error.value = 'Movie not found'
+        }
+      } catch (err) {
+        error.value = 'Failed to refresh image'
+      } finally {
+        refreshing.value = false
+      }
+    }
+
     return {
       updating,
       deleting,
@@ -154,6 +193,7 @@ export default {
       handleCardClick,
       handleAddToWatchlist,
       handleToggleWatched,
+      handleRefreshImage,
       handleDelete
     }
   }
@@ -284,6 +324,37 @@ export default {
 
 .btn-delete:disabled {
   opacity: 0.5;
+}
+
+.btn-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.2em;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .btn-add-to-watchlist {

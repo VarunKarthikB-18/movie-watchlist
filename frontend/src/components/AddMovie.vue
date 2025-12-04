@@ -175,6 +175,19 @@ export default {
       loading.value = true
       
       try {
+        // If no poster selected, try to find one automatically
+        if (!selectedPosterUrl.value && title.value) {
+          try {
+            const results = await searchMoviesTMDB(title.value)
+            if (results && results.length > 0) {
+              // Use the first result's poster
+              selectedPosterUrl.value = results[0].poster_url
+            }
+          } catch (err) {
+            console.warn('Auto-fetch poster failed:', err)
+          }
+        }
+
         await api.post('/movies', {
           title: title.value,
           year: year.value || null,

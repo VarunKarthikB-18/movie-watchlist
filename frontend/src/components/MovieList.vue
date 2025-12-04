@@ -5,14 +5,16 @@
     </div>
     
     <div v-else class="movies-grid">
-      <MovieCard 
-        v-for="movie in movies" 
-        :key="movie.id || movie.tmdb_id || movie.title"
-        :movie="movie"
-        @updated="$emit('movie-updated')"
-        @deleted="$emit('movie-deleted')"
-        @added="$emit('movie-updated')"
-        @clicked="$emit('movie-clicked', $event)" />
+      <TransitionGroup name="list">
+        <MovieCard 
+          v-for="movie in movies" 
+          :key="movie.id || movie.tmdb_id || movie.title"
+          :movie="movie"
+          @updated="$emit('movie-updated')"
+          @deleted="$emit('movie-deleted')"
+          @added="$emit('movie-updated')"
+          @clicked="$emit('movie-clicked', $event)" />
+      </TransitionGroup>
     </div>
   </div>
 </template>
@@ -72,5 +74,22 @@ export default {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 10px;
   }
+}
+
+/* List Transitions */
+.list-move,
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.5s ease;
+}
+
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.list-leave-active {
+  position: absolute;
 }
 </style>
